@@ -46,7 +46,8 @@
                 subtitle: "Homework List",
                 loading: "Loading...",
                 noHomeworks: "No homeworks yet!",
-                dueDateText: "Due date:"
+                dueDateText: "Due date:",
+                btnDelete: "Delete"
             },
             fr: {
                 title: "📚 Gestionnaire de Devoirs",
@@ -57,9 +58,9 @@
                 subtitle: "Liste des devoirs",
                 loading: "Chargement...",
                 noHomeworks: "Aucun devoir pour le moment !",
-                dueDateText: "Pour le :"
+                dueDateText: "Pour le :",
+                btnDelete: "Supprimer"
             }
-            // To add a new language pack, just add a new key here following the same structure!
         };
 
         let currentLang = 'en';
@@ -75,7 +76,6 @@
             document.getElementById('ui-btn-submit').innerText = t.btnSubmit;
             document.getElementById('ui-subtitle').innerText = t.subtitle;
             
-            // Reload list to apply language changes on text strings
             loadHomeworks();
         }
 
@@ -95,8 +95,11 @@
                 }
 
                 container.innerHTML = homeworks.map(h => `
-                    <div class="homework">
-                        <strong>${h.subject}</strong>: ${h.title} (${t.dueDateText} ${h.due_date})
+                    <div class="homework" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${h.subject}</strong>: ${h.title} (${t.dueDateText} ${h.due_date})
+                        </div>
+                        <button onclick="deleteHomework(${h.id})" style="background: #ff4d4f; padding: 4px 8px; font-size: 14px;">${t.btnDelete}</button>
                     </div>
                 `).join('');
             } catch (error) {
@@ -119,6 +122,13 @@
             document.getElementById('form-homework').reset();
             loadHomeworks();
         });
+
+        async function deleteHomework(id) {
+            await fetch(`/api/homeworks?id=${id}`, {
+                method: 'DELETE'
+            });
+            loadHomeworks();
+        }
 
         // Initial load
         loadHomeworks();

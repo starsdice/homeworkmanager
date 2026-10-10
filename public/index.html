@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Homework Manager</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
+        .homework { background: #f4f4f4; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        form { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        input, button, select { padding: 8px; font-size: 16px; }
+        button { background: #0070f3; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <h1 id="ui-title">📚 Homework Manager</h1>
+        <div>
+            <label for="lang-select" id="ui-lang-label">Language: </label>
+            <select id="lang-select" onchange="changeLanguage(this.value)">
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+            </select>
+        </div>
+    </div>
+
+    <form id="form-homework">
+        <input type="text" id="title" placeholder="Homework title" required>
+        <input type="text" id="subject" placeholder="Subject" required>
+        <input type="date" id="due_date" required>
+        <button type="submit" id="ui-btn-submit">Add Homework</button>
+    </form>
+
+    <h2 id="ui-subtitle">Homework List</h2>
+    <div id="list-homeworks">Loading...</div>
+
+    <script>
+        // --- LANGUAGE PACKS SYSTEM ---
+        const translations = {
+            en: {
+                title: "📚 Homework Manager",
+                langLabel: "Language: ",
+                placeholderTitle: "Homework title",
+                placeholderSubject: "Subject",
+                btnSubmit: "Add Homework",
+                subtitle: "Homework List",
+                loading: "Loading...",
+                noHomeworks: "No homeworks yet!",
+                dueDateText: "Due date:"
+            },
+            fr: {
+                title: "📚 Gestionnaire de Devoirs",
+                langLabel: "Langue : ",
+                placeholderTitle: "Titre du devoir",
+                placeholderSubject: "Matière",
+                btnSubmit: "Ajouter le devoir",
+                subtitle: "Liste des devoirs",
+                loading: "Chargement...",
+                noHomeworks: "Aucun devoir pour le moment !",
+                dueDateText: "Pour le :"
+            }
+            // To add a new language pack, just add a new key here following the same structure!
+        };
+
+        let currentLang = 'en';
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            const t = translations[lang];
+
+            document.getElementById('ui-title').innerText = t.title;
+            document.getElementById('ui-lang-label').innerText = t.langLabel;
+            document.getElementById('title').placeholder = t.placeholderTitle;
+            document.getElementById('subject').placeholder = t.placeholderSubject;
+            document.getElementById('ui-btn-submit').innerText = t.btnSubmit;
+            document.getElementById('ui-subtitle').innerText = t.subtitle;
+            
+            // Reload list to apply language changes on text strings
+            loadHomeworks();
+        }
+
+        // --- APP LOGIC ---
+        async function loadHomeworks() {
+            const t = translations[currentLang];
+            const container = document.getElementById('list-homeworks');
+            container.innerHTML = t.loading;
+
+            try {
+                const res = await fetch('/api/homeworks');
+                const homeworks = await res.json();
+                
+                if (homeworks.length === 0) {
+                    container.innerHTML = `<p>${t.noHomeworks}</p>`;
+                    return;
+                }
+
+                container.innerHTML = homeworks.map(h => `
+                    <div class="homework">
+                        <strong>${h.subject}</strong>: ${h.title} (${t.dueDateText} ${h.due_date})
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = '<p>Error loading homeworks.</p>';
+            }
+        }
+
+        document.getElementById('form-homework').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('title').value;
+            const subject = document.getElementById('subject').value;
+            const due_date = document.getElementById('due_date').value;
+
+            await fetch('/api/homeworks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, subject, due_date })
+            });
+
+            document.getElementById('form-homework').reset();
+            loadHomeworks();
+        });
+
+        // Initial load
+        loadHomeworks();
+    </script>
+</body>
+</html>

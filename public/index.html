@@ -35,6 +35,14 @@
     <div id="list-homeworks">Loading...</div>
 
     <script>
+        function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+        }
         // --- LANGUAGE PACKS SYSTEM ---
         const translations = {
             en: {
@@ -83,27 +91,26 @@
         async function loadHomeworks() {
             const t = translations[currentLang];
             const container = document.getElementById('list-homeworks');
-            container.innerText = t.loading;
+            container.innerHTML = t.loading;
 
             try {
                 const res = await fetch('/api/homeworks');
                 const homeworks = await res.json();
                 
                 if (homeworks.length === 0) {
-                    container.innerText = `<p>${t.noHomeworks}</p>`;
+                    container.innerHTML = `<p>${t.noHomeworks}</p>`;
                     return;
                 }
 
-                container.innerText = homeworks.map(h => `
-                    <div class="homework" style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong>${h.subject}</strong>: ${h.title} (${t.dueDateText} ${h.due_date})
-                        </div>
-                        <button onclick="deleteHomework(${h.id})" style="background: #ff4d4f; padding: 4px 8px; font-size: 14px;">${t.btnDelete}</button>
-                    </div>
-                `).join('');
-            } catch (error) {
-                container.innerText = '<p>Error loading homeworks.</p>';
+                container.innerHTML = homeworks.map(h => `
+    <div class="homework" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <strong>${escapeHtml(h.subject)}</strong>: ${escapeHtml(h.title)} (${t.dueDateText} ${escapeHtml(h.due_date)})
+        </div>
+        <button onclick="deleteHomework(${h.id})" style="background: #ff4d4f; padding: 4px 8px; font-size: 14px;">${t.btnDelete}</button>
+    </div>
+`).join(''); catch (error) {
+                container.innerHTML = '<p>Error loading homeworks.</p>';
             }
         }
 

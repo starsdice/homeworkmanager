@@ -13,7 +13,7 @@
     </style>
 </head>
 <body>
-    <div class="header-bar">
+ <div class="header-bar">
         <h1 id="ui-title">📚 Homework Manager</h1>
         <div>
             <label for="lang-select" id="ui-lang-label">Language: </label>
@@ -22,6 +22,20 @@
                 <option value="fr">Français</option>
                 <option value="es">Español</option>
             </select>
+        </div>
+    </div>
+
+    <!-- Barre d'authentification -->
+    <div class="auth-bar" id="auth-container">
+        <div id="user-info" style="display: none;">
+            <span id="ui-connected">Connecté :</span> <span id="user-email"></span> 
+            <button onclick="logout()" style="background: #ff4d4f; padding: 4px 8px;" id="ui-btn-logout">Déconnexion</button>
+        </div>
+        <div id="auth-forms" style="display: flex; gap: 10px; width: 100%;">
+            <input type="email" id="email" placeholder="Email" style="flex:1;">
+            <input type="password" id="password" placeholder="Mot de passe" style="flex:1;">
+            <button onclick="login()" id="ui-btn-login">Se connecter</button>
+            <button onclick="signup()" style="background: #52c41a;" id="ui-btn-signup">S'inscrire</button>
         </div>
     </div>
 

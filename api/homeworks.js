@@ -8,13 +8,23 @@ const supabase = createClient(
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   try {
+    const authHeader = req.headers.authorization;
+    let userClient = supabase;
+
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      // Crée un client lié à la session de l'utilisateur pour respecter les règles RLS
+      userClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } }
+      });
+    }
     // GET: Fetch all homeworks
     if (req.method === 'GET') {
       const { data, error } = await supabase.from('homeworks').select('*').order('id', { ascending: true });

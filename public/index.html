@@ -1,10 +1,8 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Homework Manager</title>
-    <!-- SDK JS de Supabase pour l'authentification front-end -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
         .homework { background: #f4f4f4; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
@@ -32,7 +30,7 @@
     <div class="auth-bar" id="auth-container">
         <div id="user-info" style="display: none;">
             <span id="ui-connected">Connecté :</span> <span id="user-email"></span> 
-            <button onclick="logout()" style="background: #ff4d4f; padding: 4px 8px;" id="ui-btn-logout">Déconnexion</button>
+            <button type="button" onclick="logout()" style="background: #ff4d4f; padding: 4px 8px;" id="ui-btn-logout">Déconnexion</button>
         </div>
         <div id="auth-forms" style="display: flex; gap: 10px; width: 100%;">
             <input type="email" id="email" placeholder="Email" style="flex:1;">
@@ -53,8 +51,6 @@
     <div id="list-homeworks">Loading...</div>
 
     <script>
-
-        const backend0 = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/&/g, "&amp;")
@@ -139,37 +135,61 @@
             loadHomeworks();
         }
 
-        // --- AUTHENTIFICATION ---
-        async function checkUser() {
-            const { data: { session } } = await backend0.auth.getSession();
-            updateAuthUI(session);
-        }
-
-        async function signup() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const { error } = await backend0.auth.signUp({ email, password });
-            if (error) alert(error.message);
-            else alert('Inscription réussie !');
+        // --- AUTHENTIFICATION VIA API ---
+        function checkUser() {
+            // Récupère la session stockée en mémoire dans la page
+            updateAuthUI(window.userSession);
         }
 
         async function login() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            const { error } = await backend0.auth.signInWithPassword({ email, password });
-            if (error) alert(error.message);
-            else checkUser();
+
+            const response = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'login', email, password })
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                alert(result.error || "Erreur de connexion");
+                return;
+            }
+
+            window.userSession = result.session;
+            alert('Connexion réussie !');
+            checkUser();
         }
 
-        async function logout() {
-            await backend0.auth.signOut();
+        async function signup() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'signup', email, password })
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                alert(result.error || "Erreur lors de l'inscription");
+                return;
+            }
+
+            alert('Inscription réussie ! Vous pouvez vous connecter.');
+        }
+
+        function logout() {
+            window.userSession = null;
             checkUser();
         }
 
         function updateAuthUI(session) {
             const userInfo = document.getElementById('user-info');
             const authForms = document.getElementById('auth-forms');
-            if (session) {
+            if (session && session.user) {
                 userInfo.style.display = 'block';
                 authForms.style.display = 'none';
                 document.getElementById('user-email').innerText = session.user.email;
@@ -186,7 +206,6 @@
             container.innerHTML = t.loading;
 
             try {
-                // Appel de ton API (publique pour le GET)
                 const res = await fetch('/api/homeworks');
                 const homeworks = await res.json();
                 
@@ -200,7 +219,7 @@
                         <div>
                             <strong>${escapeHtml(h.subject)}</strong>: ${escapeHtml(h.title)} (${t.dueDateText} ${escapeHtml(h.due_date)})
                         </div>
-                        <button onclick="deleteHomework(${h.id})" style="background: #ff4d4f; padding: 4px 8px; font-size: 14px;">${t.btnDelete}</button>
+                        <button type="button" onclick="deleteHomework(${h.id})" style="background: #ff4d4f; padding: 4px 8px; font-size: 14px;">${t.btnDelete}</button>
                     </div>
                 `).join('');
             } catch (error) {
@@ -215,9 +234,7 @@
             const subject = document.getElementById('subject').value;
             const due_date = document.getElementById('due_date').value;
 
-            // Récupère la session active pour l'envoyer à l'API
-            const { data: { session } } = await backend0.auth.getSession();
-            if (!session) {
+            if (!window.userSession) {
                 alert(t.loginAlert);
                 return;
             }
@@ -226,9 +243,9 @@
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}` // Envoie le jeton de sécurité
+                    'Authorization': `Bearer ${window.userSession.access_token}`
                 },
-                body: JSON.stringify({ title, subject, due_date, user_id: session.user.id })
+                body: JSON.stringify({ title, subject, due_date, user_id: window.userSession.user.id })
             });
 
             document.getElementById('form-homework').reset();
@@ -236,11 +253,9 @@
         });
 
         async function deleteHomework(id) {
-            const { data: { session } } = await backend0.auth.getSession();
-            
             const headers = {};
-            if (session) {
-                headers['Authorization'] = `Bearer ${session.access_token}`;
+            if (window.userSession) {
+                headers['Authorization'] = `Bearer ${window.userSession.access_token}`;
             }
 
             const res = await fetch(`/api/homeworks?id=${id}`, {

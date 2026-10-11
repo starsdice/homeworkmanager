@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Homework Manager</title>
-    <!-- SDK JS de Supabase pour l'authentification front-end -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SDK JS de Supa*base pour l'authentification front-end -->
+    <script src="https://cdn.jsdelivr.net/npm/@supa*base/supa*base-js@2"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
         .homework { background: #f4f4f4; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
@@ -53,6 +53,8 @@
     <div id="list-homeworks">Loading...</div>
 
     <script>
+
+        const backend0 = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/&/g, "&amp;")
@@ -139,14 +141,14 @@
 
         // --- AUTHENTIFICATION ---
         async function checkUser() {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await backend0.auth.getSession();
             updateAuthUI(session);
         }
 
         async function signup() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            const { error } = await supabase.auth.signUp({ email, password });
+            const { error } = await backend0.auth.signUp({ email, password });
             if (error) alert(error.message);
             else alert('Inscription réussie !');
         }
@@ -154,13 +156,13 @@
         async function login() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            const { error } = await backend0.auth.signInWithPassword({ email, password });
             if (error) alert(error.message);
             else checkUser();
         }
 
         async function logout() {
-            await supabase.auth.signOut();
+            await backend0.auth.signOut();
             checkUser();
         }
 
@@ -214,7 +216,7 @@
             const due_date = document.getElementById('due_date').value;
 
             // Récupère la session active pour l'envoyer à l'API
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await backend0.auth.getSession();
             if (!session) {
                 alert(t.loginAlert);
                 return;
@@ -234,7 +236,7 @@
         });
 
         async function deleteHomework(id) {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await backend0.auth.getSession();
             
             const headers = {};
             if (session) {

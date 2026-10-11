@@ -10,6 +10,7 @@
         input, button, select { padding: 8px; font-size: 16px; }
         button { background: #0070f3; color: white; border: none; cursor: pointer; border-radius: 4px; }
         .header-bar { display: flex; justify-content: space-between; align-items: center; }
+        .auth-bar { background: #eef2f7; padding: 10px; border-radius: 5px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -22,6 +23,21 @@
                 <option value="fr">Français</option>
                 <option value="es">Español</option>
             </select>
+        </div>
+    </div>
+
+    <!-- Authentication Bar -->
+    <div class="auth-bar" id="auth-container">
+        <div id="user-info" style="display: none;">
+            <span id="ui-connected">Connected as:</span> <span id="user-email"></span> 
+            <button type="button" onclick="logout()" style="background: #ff4d4f; padding: 4px 8px;" id="ui-btn-logout">Logout</button>
+            <button type="button" onclick="deleteAccount()" style="background: #8b0000; padding: 4px 8px;" id="ui-btn-delete-acc">Delete Account</button>
+        </div>
+        <div id="auth-forms" style="display: flex; gap: 10px; width: 100%;">
+            <input type="email" id="email" placeholder="Email" style="flex:1;">
+            <input type="password" id="password" placeholder="Password" style="flex:1;">
+            <button type="button" onclick="login()" id="ui-btn-login">Login</button>
+            <button type="button" onclick="signup()" style="background: #52c41a;" id="ui-btn-signup">Sign up</button>
         </div>
     </div>
 
@@ -57,7 +73,21 @@
                 loading: "Loading...",
                 noHomeworks: "No homeworks yet!",
                 dueDateText: "Due date:",
-                btnDelete: "Delete"
+                btnDelete: "Delete",
+                connectedText: "Connected as:",
+                btnLogout: "Logout",
+                btnDeleteAcc: "Delete Account",
+                btnLogin: "Login",
+                btnSignup: "Sign up",
+                loginAlert: "You must be logged in to add homework!",
+                loginSuccess: "Login successful!",
+                loginError: "Login error",
+                signupSuccess: "Registration successful! You can now log in.",
+                signupError: "Registration error",
+                deleteConfirm: "Are you sure you want to permanently delete your account? This action is irreversible and will clear all your data.",
+                deleteAccountSuccess: "Your account has been successfully deleted.",
+                deleteAccountError: "Error deleting account",
+                deleteHomeworkError: "Unable to delete this homework (verify you are the owner)."
             },
             fr: {
                 title: "📚 Gestionnaire de Devoirs",
@@ -69,7 +99,21 @@
                 loading: "Chargement...",
                 noHomeworks: "Aucun devoir pour le moment !",
                 dueDateText: "Pour le :",
-                btnDelete: "Supprimer"
+                btnDelete: "Supprimer",
+                connectedText: "Connecté en tant que :",
+                btnLogout: "Déconnexion",
+                btnDeleteAcc: "Supprimer mon compte",
+                btnLogin: "Se connecter",
+                btnSignup: "S'inscrire",
+                loginAlert: "Vous devez être connecté pour ajouter un devoir !",
+                loginSuccess: "Connexion réussie !",
+                loginError: "Erreur de connexion",
+                signupSuccess: "Inscription réussie ! Vous pouvez vous connecter.",
+                signupError: "Erreur lors de l'inscription",
+                deleteConfirm: "Êtes-vous sûr de vouloir supprimer définitivement votre compte ? Cette action est irréversible et effacera toutes vos données.",
+                deleteAccountSuccess: "Votre compte a été supprimé avec succès.",
+                deleteAccountError: "Erreur lors de la suppression du compte",
+                deleteHomeworkError: "Impossible de supprimer ce devoir (vérifiez que vous en êtes l'auteur)."
             },
             es: {
                 title: "📚 Gestor de tareas",
@@ -81,7 +125,21 @@
                 loading: "Cargando...",
                 noHomeworks: "¡No hay tareas por el momento!",
                 dueDateText: "Para el:",
-                btnDelete: "Eliminar"
+                btnDelete: "Eliminar",
+                connectedText: "Conectado como:",
+                btnLogout: "Cerrar sesión",
+                btnDeleteAcc: "Eliminar cuenta",
+                btnLogin: "Iniciar sesión",
+                btnSignup: "Registrarse",
+                loginAlert: "¡Debes iniciar sesión para añadir una tarea!",
+                loginSuccess: "¡Inicio de sesión exitoso!",
+                loginError: "Error de inicio de sesión",
+                signupSuccess: "¡Registro exitoso! Ya puedes iniciar sesión.",
+                signupError: "Error en el registro",
+                deleteConfirm: "¿Estás seguro de que deseas eliminar permanentemente tu cuenta? Esta acción es irreversible y borrará todos tus datos.",
+                deleteAccountSuccess: "Tu cuenta ha sido eliminada con éxito.",
+                deleteAccountError: "Error al eliminar la cuenta",
+                deleteHomeworkError: "No se puede eliminar esta tarea (verifica que eres el propietario)."
             }
         };
 
@@ -97,11 +155,108 @@
             document.getElementById('subject').placeholder = t.placeholderSubject;
             document.getElementById('ui-btn-submit').innerText = t.btnSubmit;
             document.getElementById('ui-subtitle').innerText = t.subtitle;
+            document.getElementById('ui-connected').innerText = t.connectedText;
+            document.getElementById('ui-btn-logout').innerText = t.btnLogout;
+            document.getElementById('ui-btn-delete-acc').innerText = t.btnDeleteAcc;
+            document.getElementById('ui-btn-login').innerText = t.btnLogin;
+            document.getElementById('ui-btn-signup').innerText = t.btnSignup;
             
             loadHomeworks();
         }
 
-        // --- APP LOGIC ---
+        // --- AUTHENTICATION VIA API ---
+        function checkUser() {
+            updateAuthUI(window.userSession);
+        }
+
+        async function login() {
+            const t = translations[currentLang];
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'login', email, password })
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                alert(result.error || t.loginError);
+                return;
+            }
+
+            window.userSession = result.session;
+            alert(t.loginSuccess);
+            checkUser();
+        }
+
+        async function signup() {
+            const t = translations[currentLang];
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'signup', email, password })
+            });
+
+            const result = await response.json();
+            if (!response.ok) {
+                alert(result.error || t.signupError);
+                return;
+            }
+
+            alert(t.signupSuccess);
+        }
+
+        async function deleteAccount() {
+            const t = translations[currentLang];
+            if (!window.userSession) return;
+            
+            const confirmation = confirm(t.deleteConfirm);
+            if (!confirmation) return;
+
+            try {
+                const response = await fetch('/api/delete-account', {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${window.userSession.access_token}`
+                    }
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || t.deleteAccountError);
+                }
+
+                alert(t.deleteAccountSuccess);
+                logout();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        function logout() {
+            window.userSession = null;
+            checkUser();
+        }
+
+        function updateAuthUI(session) {
+            const userInfo = document.getElementById('user-info');
+            const authForms = document.getElementById('auth-forms');
+            if (session && session.user) {
+                userInfo.style.display = 'block';
+                authForms.style.display = 'none';
+                document.getElementById('user-email').innerText = session.user.email;
+            } else {
+                userInfo.style.display = 'none';
+                authForms.style.display = 'flex';
+            }
+        }
+
+        // --- APP LOGIC (Via Backend API) ---
         async function loadHomeworks() {
             const t = translations[currentLang];
             const container = document.getElementById('list-homeworks');
@@ -111,7 +266,7 @@
                 const res = await fetch('/api/homeworks');
                 const homeworks = await res.json();
                 
-                if (homeworks.length === 0) {
+                if (!Array.isArray(homeworks) || homeworks.length === 0) {
                     container.innerHTML = `<p>${t.noHomeworks}</p>`;
                     return;
                 }
@@ -121,7 +276,7 @@
                         <div>
                             <strong>${escapeHtml(h.subject)}</strong>: ${escapeHtml(h.title)} (${t.dueDateText} ${escapeHtml(h.due_date)})
                         </div>
-                        <button onclick="deleteHomework(${h.id})" style="background: #ff4d4f; padding: 4px 8px; font-size: 14px;">${t.btnDelete}</button>
+                        <button type="button" onclick="deleteHomework(${h.id})" style="background: #ff4d4f; padding: 4px 8px; font-size: 14px;">${t.btnDelete}</button>
                     </div>
                 `).join('');
             } catch (error) {
@@ -131,14 +286,23 @@
 
         document.getElementById('form-homework').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const t = translations[currentLang];
             const title = document.getElementById('title').value;
             const subject = document.getElementById('subject').value;
             const due_date = document.getElementById('due_date').value;
 
+            if (!window.userSession) {
+                alert(t.loginAlert);
+                return;
+            }
+
             await fetch('/api/homeworks', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, subject, due_date })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${window.userSession.access_token}`
+                },
+                body: JSON.stringify({ title, subject, due_date, user_id: window.userSession.user.id })
             });
 
             document.getElementById('form-homework').reset();
@@ -146,13 +310,26 @@
         });
 
         async function deleteHomework(id) {
-            await fetch(`/api/homeworks?id=${id}`, {
-                method: 'DELETE'
+            const t = translations[currentLang];
+            const headers = {};
+            if (window.userSession) {
+                headers['Authorization'] = `Bearer ${window.userSession.access_token}`;
+            }
+
+            const res = await fetch(`/api/homeworks?id=${id}`, {
+                method: 'DELETE',
+                headers: headers
             });
+
+            if (!res.ok) {
+                alert(t.deleteHomeworkError);
+            }
+            
             loadHomeworks();
         }
 
         // Initial load
+        checkUser();
         loadHomeworks();
     </script>
 </body>

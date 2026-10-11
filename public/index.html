@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <title>Homework Manager</title>
+    <!-- SDK JS de Supabase pour l'authentification front-end -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
         .homework { background: #f4f4f4; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
@@ -10,10 +12,11 @@
         input, button, select { padding: 8px; font-size: 16px; }
         button { background: #0070f3; color: white; border: none; cursor: pointer; border-radius: 4px; }
         .header-bar { display: flex; justify-content: space-between; align-items: center; }
+        .auth-bar { background: #eef2f7; padding: 10px; border-radius: 5px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     </style>
 </head>
 <body>
- <div class="header-bar">
+    <div class="header-bar">
         <h1 id="ui-title">📚 Homework Manager</h1>
         <div>
             <label for="lang-select" id="ui-lang-label">Language: </label>
@@ -71,7 +74,12 @@
                 loading: "Loading...",
                 noHomeworks: "No homeworks yet!",
                 dueDateText: "Due date:",
-                btnDelete: "Delete"
+                btnDelete: "Delete",
+                connectedText: "Connected as:",
+                btnLogout: "Logout",
+                btnLogin: "Login",
+                btnSignup: "Sign up",
+                loginAlert: "You must be logged in to add homework!"
             },
             fr: {
                 title: "📚 Gestionnaire de Devoirs",
@@ -83,7 +91,12 @@
                 loading: "Chargement...",
                 noHomeworks: "Aucun devoir pour le moment !",
                 dueDateText: "Pour le :",
-                btnDelete: "Supprimer"
+                btnDelete: "Supprimer",
+                connectedText: "Connecté en tant que :",
+                btnLogout: "Déconnexion",
+                btnLogin: "Se connecter",
+                btnSignup: "S'inscrire",
+                loginAlert: "Vous devez être connecté pour ajouter un devoir !"
             },
             es: {
                 title: "📚 Gestor de tareas",
@@ -95,7 +108,12 @@
                 loading: "Cargando...",
                 noHomeworks: "¡No hay tareas por el momento!",
                 dueDateText: "Para el:",
-                btnDelete: "Eliminar"
+                btnDelete: "Eliminar",
+                connectedText: "Conectado como:",
+                btnLogout: "Cerrar sesión",
+                btnLogin: "Iniciar sesión",
+                btnSignup: "Registrarse",
+                loginAlert: "¡Debes iniciar sesión para añadir una tarea!"
             }
         };
 
@@ -111,21 +129,66 @@
             document.getElementById('subject').placeholder = t.placeholderSubject;
             document.getElementById('ui-btn-submit').innerText = t.btnSubmit;
             document.getElementById('ui-subtitle').innerText = t.subtitle;
+            document.getElementById('ui-connected').innerText = t.connectedText;
+            document.getElementById('ui-btn-logout').innerText = t.btnLogout;
+            document.getElementById('ui-btn-login').innerText = t.btnLogin;
+            document.getElementById('ui-btn-signup').innerText = t.btnSignup;
             
             loadHomeworks();
         }
 
-        // --- APP LOGIC ---
+        // --- AUTHENTIFICATION ---
+        async function checkUser() {
+            const { data: { session } } = await supabase.auth.getSession();
+            updateAuthUI(session);
+        }
+
+        async function signup() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const { error } = await supabase.auth.signUp({ email, password });
+            if (error) alert(error.message);
+            else alert('Inscription réussie !');
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) alert(error.message);
+            else checkUser();
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            checkUser();
+        }
+
+        function updateAuthUI(session) {
+            const userInfo = document.getElementById('user-info');
+            const authForms = document.getElementById('auth-forms');
+            if (session) {
+                userInfo.style.display = 'block';
+                authForms.style.display = 'none';
+                document.getElementById('user-email').innerText = session.user.email;
+            } else {
+                userInfo.style.display = 'none';
+                authForms.style.display = 'flex';
+            }
+        }
+
+        // --- APP LOGIC (Via ton API backend) ---
         async function loadHomeworks() {
             const t = translations[currentLang];
             const container = document.getElementById('list-homeworks');
             container.innerHTML = t.loading;
 
             try {
+                // Appel de ton API (publique pour le GET)
                 const res = await fetch('/api/homeworks');
                 const homeworks = await res.json();
                 
-                if (homeworks.length === 0) {
+                if (!Array.isArray(homeworks) || homeworks.length === 0) {
                     container.innerHTML = `<p>${t.noHomeworks}</p>`;
                     return;
                 }
@@ -145,14 +208,25 @@
 
         document.getElementById('form-homework').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const t = translations[currentLang];
             const title = document.getElementById('title').value;
             const subject = document.getElementById('subject').value;
             const due_date = document.getElementById('due_date').value;
 
+            // Récupère la session active pour l'envoyer à l'API
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                alert(t.loginAlert);
+                return;
+            }
+
             await fetch('/api/homeworks', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, subject, due_date })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}` // Envoie le jeton de sécurité
+                },
+                body: JSON.stringify({ title, subject, due_date, user_id: session.user.id })
             });
 
             document.getElementById('form-homework').reset();
@@ -160,13 +234,27 @@
         });
 
         async function deleteHomework(id) {
-            await fetch(`/api/homeworks?id=${id}`, {
-                method: 'DELETE'
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            const headers = {};
+            if (session) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+
+            const res = await fetch(`/api/homeworks?id=${id}`, {
+                method: 'DELETE',
+                headers: headers
             });
+
+            if (!res.ok) {
+                alert("Impossible de supprimer ce devoir (vérifiez que vous en êtes l'auteur).");
+            }
+            
             loadHomeworks();
         }
 
         // Initial load
+        checkUser();
         loadHomeworks();
     </script>
 </body>

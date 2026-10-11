@@ -25,29 +25,30 @@ export default async function handler(req, res) {
         global: { headers: { Authorization: `Bearer ${token}` } }
       });
     }
-    // GET: Fetch all homeworks
+    
+    // GET: Fetch all homeworks (Public : utilise supabase global)
     if (req.method === 'GET') {
       const { data, error } = await supabase.from('homeworks').select('*').order('id', { ascending: true });
       if (error) throw error;
       return res.status(200).json(data);
     }
 
-    // POST: Add a new homework
+    // POST: Add a new homework (Utilise userClient pour respecter les RLS et associer l'user)
     if (req.method === 'POST') {
-      const { title, subject, due_date } = req.body;
-      const { data, error } = await supabase
+      const { title, subject, due_date, user_id } = req.body; // Récupère aussi user_id si envoyé
+      const { data, error } = await userClient
         .from('homeworks')
-        .insert([{ title, subject, due_date, completed: false }])
+        .insert([{ title, subject, due_date, user_id }])
         .select();
       
       if (error) throw error;
       return res.status(201).json(data[0]);
     }
 
-    // DELETE: Remove a homework by ID
+    // DELETE: Remove a homework by ID (Utilise userClient pour que le RLS vérifie le propriétaire)
     if (req.method === 'DELETE') {
-      const { id } = req.query; // Récupère l'ID depuis l'URL (ex: /api/homeworks?id=5)
-      const { error } = await supabase.from('homeworks').delete().eq('id', id);
+      const { id } = req.query; 
+      const { error } = await userClient.from('homeworks').delete().eq('id', id);
       
       if (error) throw error;
       return res.status(200).json({ message: "Homework deleted successfully" });

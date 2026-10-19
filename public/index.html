@@ -285,29 +285,19 @@
         }
 
         document.getElementById('form-homework').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const t = translations[currentLang];
-            const title = document.getElementById('title').value;
-            const subject = document.getElementById('subject').value;
-            const due_date = document.getElementById('due_date').value;
+        e.preventDefault();
+        const title = document.getElementById('title').value;
+        const subject = document.getElementById('subject').value;
+        const due_date = document.getElementById('due_date').value;
 
-            if (!window.userSession) {
-                alert(t.loginAlert);
-                return;
-            }
-
-            await fetch('/api/homeworks', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${window.userSession.access_token}`
-                },
-                body: JSON.stringify({ title, subject, due_date, user_id: window.userSession.user.id })
-            });
-
-            document.getElementById('form-homework').reset();
-            loadHomeworks();
+        await fetch('/api/homeworks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, subject, due_date })
         });
+
+    document.getElementById('form-homework').reset();
+    loadHomeworks();
 
         async function deleteHomework(id) {
             const t = translations[currentLang];

@@ -22,19 +22,37 @@ export default async function handler(req, res) {
   try {
     const { action, email, password } = req.body;
 
-    // Action d'inscription
+    // 1. Signup
     if (action === 'signup') {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
       return res.status(200).json({ message: "Inscription réussie", data });
     }
 
-    // Action de connexion
+    // 2. Login (Sets HttpOnly Cookie)
     if (action === 'login') {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // Retourne la session (qui contient le token d'accès) au front-end
-      return res.status(200).json({ session: data.session });
+
+      // Set secure HttpOnly cookie containing the access token
+      const cookieOptions = [
+        `sb-access-token=${data.session.access_token}`,
+        'HttpOnly',
+        'Path=/',
+        'SameSite=Lax',
+        `Max-Age=${60 * 60 * 24 * 7}`, // 1 week
+        process.env.NODE_ENV === 'production' ? 'Secure' : ''
+      ].filter(Boolean).join('; ');
+
+      res.setHeader('Set-Cookie', cookieOptions);
+      return res.status(200).json({ user: data.user });
+    }
+
+    // 3. Logout (Clears Cookie)
+    if (action === 'logout') {
+      const clearedCookie = 'sb-access-token=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0';
+      res.setHeader('Set-Cookie', clearedCookie);
+      return res.status(200).json({ message: "Déconnexion réussie" });
     }
 
     return res.status(400).json({ error: "Action non reconnue" });
@@ -42,4 +60,24 @@ export default async function handler(req, res) {
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
+}
+```[cite: 1]
+
+---
+
+### Step 2: Update Protected API Routes to Read Cookies
+Instead of looking for an `Authorization: Bearer` header, your other API routes (`api/homeworks.js` and `api/delete-account.js`) should parse the incoming cookie header.
+
+Add a simple helper at the top of your API files to extract the cookie:
+```javascript
+function getCookie(req, name) {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const cookies = Object.fromEntries(
+    cookieHeader.split('; ').map(c => {
+      const [key, ...v] = c.split('=');
+      return [key, decodeURIComponent(v.join('='))];
+    })
+  );
+  return cookies[name] || null;
 }

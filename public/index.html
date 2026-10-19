@@ -61,7 +61,6 @@
                       .replace(/'/g, "&#039;");
         }
 
-        // --- LANGUAGE PACKS SYSTEM ---
         const translations = {
             en: {
                 title: "Homework Manager 1.0.0.1a",
@@ -84,10 +83,10 @@
                 loginError: "Login error",
                 signupSuccess: "Registration successful! You can now log in.",
                 signupError: "Registration error",
-                deleteConfirm: "Are you sure you want to permanently delete your account? This action is irreversible and will clear all your data.",
+                deleteConfirm: "Are you sure you want to permanently delete your account?",
                 deleteAccountSuccess: "Your account has been successfully deleted.",
                 deleteAccountError: "Error deleting account",
-                deleteHomeworkError: "Unable to delete this homework (verify you are the owner)."
+                deleteHomeworkError: "Unable to delete this homework."
             },
             fr: {
                 title: "Gestionnaire de Devoirs 1.0.0.1a",
@@ -108,12 +107,12 @@
                 loginAlert: "Vous devez être connecté pour ajouter un devoir !",
                 loginSuccess: "Connexion réussie !",
                 loginError: "Erreur de connexion",
-                signupSuccess: "Inscription réussie ! Vous pouvez vous connecter.",
+                signupSuccess: "Inscription réussie !",
                 signupError: "Erreur lors de l'inscription",
-                deleteConfirm: "Êtes-vous sûr de vouloir supprimer définitivement votre compte ? Cette action est irréversible et effacera toutes vos données.",
+                deleteConfirm: "Êtes-vous sûr de vouloir supprimer définitivement votre compte ?",
                 deleteAccountSuccess: "Votre compte a été supprimé avec succès.",
                 deleteAccountError: "Erreur lors de la suppression du compte",
-                deleteHomeworkError: "Impossible de supprimer ce devoir (vérifiez que vous en êtes l'auteur)."
+                deleteHomeworkError: "Impossible de supprimer ce devoir."
             },
             es: {
                 title: "Gestor de tareas 1.0.0.1a",
@@ -134,12 +133,12 @@
                 loginAlert: "¡Debes iniciar sesión para añadir una tarea!",
                 loginSuccess: "¡Inicio de sesión exitoso!",
                 loginError: "Error de inicio de sesión",
-                signupSuccess: "¡Registro exitoso! Ya puedes iniciar sesión.",
+                signupSuccess: "¡Registro exitoso!",
                 signupError: "Error en el registro",
-                deleteConfirm: "¿Estás seguro de que deseas eliminar permanentemente tu cuenta? Esta acción es irreversible y borrará todos tus datos.",
+                deleteConfirm: "¿Estás seguro de que deseas eliminar permanentemente tu cuenta?",
                 deleteAccountSuccess: "Tu cuenta ha sido eliminada con éxito.",
                 deleteAccountError: "Error al eliminar la cuenta",
-                deleteHomeworkError: "No se puede eliminar esta tarea (verifica que eres el propietario)."
+                deleteHomeworkError: "No se puede eliminar esta tarea."
             }
         };
 
@@ -164,9 +163,22 @@
             loadHomeworks();
         }
 
-        // --- AUTHENTICATION VIA API ---
-        function checkUser() {
-            updateAuthUI(window.userSession);
+        // --- AUTHENTICATION VIA COOKIES ---
+        async function checkUser() {
+            try {
+                const res = await fetch('/api/auth?action=session', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    updateAuthUI(data.user);
+                } else {
+                    updateAuthUI(null);
+                }
+            } catch (e) {
+                updateAuthUI(null);
+            }
         }
 
         async function login() {
@@ -177,6 +189,7 @@
             const response = await fetch('/api/auth', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ action: 'login', email, password })
             });
 
@@ -186,9 +199,8 @@
                 return;
             }
 
-            window.userSession = result.session;
             alert(t.loginSuccess);
-            checkUser();
+            location.reload();
         }
 
         async function signup() {
@@ -199,6 +211,7 @@
             const response = await fetch('/api/auth', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ action: 'signup', email, password })
             });
 
@@ -213,17 +226,13 @@
 
         async function deleteAccount() {
             const t = translations[currentLang];
-            if (!window.userSession) return;
-            
             const confirmation = confirm(t.deleteConfirm);
             if (!confirmation) return;
 
             try {
                 const response = await fetch('/api/delete-account', {
                     method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${window.userSession.access_token}`
-                    }
+                    credentials: 'include'
                 });
 
                 const result = await response.json();
@@ -238,32 +247,37 @@
             }
         }
 
-        function logout() {
-            window.userSession = null;
-            checkUser();
+        async function logout() {
+            await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ action: 'logout' })
+            });
+            location.reload();
         }
 
-        function updateAuthUI(session) {
+        function updateAuthUI(user) {
             const userInfo = document.getElementById('user-info');
             const authForms = document.getElementById('auth-forms');
-            if (session && session.user) {
+            if (user) {
                 userInfo.style.display = 'block';
                 authForms.style.display = 'none';
-                document.getElementById('user-email').innerText = session.user.email;
+                document.getElementById('user-email').innerText = user.email;
             } else {
                 userInfo.style.display = 'none';
                 authForms.style.display = 'flex';
             }
         }
 
-        // --- APP LOGIC (Via Backend API) ---
+        // --- APP LOGIC ---
         async function loadHomeworks() {
             const t = translations[currentLang];
             const container = document.getElementById('list-homeworks');
             container.innerHTML = t.loading;
 
             try {
-                const res = await fetch('/api/homeworks');
+                const res = await fetch('/api/homeworks', { credentials: 'include' });
                 const homeworks = await res.json();
                 
                 if (!Array.isArray(homeworks) || homeworks.length === 0) {
@@ -286,24 +300,22 @@
 
         document.getElementById('form-homework').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const t = translations[currentLang];
             const title = document.getElementById('title').value;
             const subject = document.getElementById('subject').value;
             const due_date = document.getElementById('due_date').value;
 
-            if (!window.userSession) {
-                alert(t.loginAlert);
+            const res = await fetch('/api/homeworks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ title, subject, due_date })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.error || translations[currentLang].loginAlert);
                 return;
             }
-
-            await fetch('/api/homeworks', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${window.userSession.access_token}`
-                },
-                body: JSON.stringify({ title, subject, due_date, user_id: window.userSession.user.id })
-            });
 
             document.getElementById('form-homework').reset();
             loadHomeworks();
@@ -311,14 +323,9 @@
 
         async function deleteHomework(id) {
             const t = translations[currentLang];
-            const headers = {};
-            if (window.userSession) {
-                headers['Authorization'] = `Bearer ${window.userSession.access_token}`;
-            }
-
             const res = await fetch(`/api/homeworks?id=${id}`, {
                 method: 'DELETE',
-                headers: headers
+                credentials: 'include'
             });
 
             if (!res.ok) {

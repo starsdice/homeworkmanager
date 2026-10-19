@@ -5,6 +5,13 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
+function getCookie(req, name) {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
@@ -15,37 +22,41 @@ export default async function handler(req, res) {
   }
 
   try {
-    const authHeader = req.headers.authorization;
+    const token = getCookie(req, 'sb-access-token');
     let userClient = supabase;
 
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      // Crée un client lié à la session de l'utilisateur pour respecter les règles RLS
+    if (token) {
       userClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
         global: { headers: { Authorization: `Bearer ${token}` } }
       });
     }
     
-    // GET: Fetch all homeworks (Public : utilise supabase global)
+    // GET: Fetch all homeworks
     if (req.method === 'GET') {
       const { data, error } = await supabase.from('homeworks').select('*').order('id', { ascending: true });
       if (error) throw error;
       return res.status(200).json(data);
     }
 
-    // POST: Add a new homework (Utilise userClient pour respecter les RLS et associer l'user)
+    // POST: Add a new homework
     if (req.method === 'POST') {
-      const { title, subject, due_date, user_id } = req.body; // Récupère aussi user_id si envoyé
+      const { title, subject, due_date } = req.body;
+      
+      const { data: { user }, error: userError } = await userClient.auth.getUser();
+      if (userError || !user) {
+        return res.status(401).json({ error: "Non autorisé. Veuillez vous connecter." });
+      }
+
       const { data, error } = await userClient
         .from('homeworks')
-        .insert([{ title, subject, due_date, user_id }])
+        .insert([{ title, subject, due_date, user_id: user.id }])
         .select();
       
       if (error) throw error;
       return res.status(201).json(data[0]);
     }
 
-    // DELETE: Remove a homework by ID (Utilise userClient pour que le RLS vérifie le propriétaire)
+    // DELETE: Remove a homework by ID
     if (req.method === 'DELETE') {
       const { id } = req.query; 
       const { error } = await userClient.from('homeworks').delete().eq('id', id);

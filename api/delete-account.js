@@ -1,5 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
+function getCookie(req, name) {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'DELETE,OPTIONS');
@@ -15,14 +22,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    const token = getCookie(req, 'sb-access-token');
+    if (!token) {
       return res.status(401).json({ error: "Non autorisé. Jeton manquant." });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-
-    // 1. Client standard pour vérifier l'utilisateur connecté via son token
     const supabaseUserClient = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
@@ -33,7 +37,6 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Utilisateur non authentifié ou invalide." });
     }
 
-    // 2. Client Admin (Service Role) pour effectuer la suppression définitive de l'utilisateur
     const supabaseAdmin = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -42,6 +45,7 @@ export default async function handler(req, res) {
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
     if (deleteError) throw deleteError;
 
+    res.setHeader('Set-Cookie', 'sb-access-token=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0');
     return res.status(200).json({ message: "Compte supprimé avec succès." });
 
   } catch (error) {
